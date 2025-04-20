@@ -57,7 +57,7 @@ def create_app(config=Config):
     mail.init_app(app)
     moment.init_app(app)
     babel.init_app(app, locale_selector=get_locale)
-    app.elasticsearch = Elasticsearch(app.config['ELASTICSEARCH_URL'])
+    app.elasticsearch = Elasticsearch(app.config['ELASTICSEARCH_URL']) if app.config['ELASTICSEARCH_URL'] else None
         
     from app.errors import bp as errors
     app.register_blueprint(errors)

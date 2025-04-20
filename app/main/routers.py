@@ -1,9 +1,9 @@
 from app import db
 from flask import render_template, flash, redirect, url_for, request, g, current_app
-from app.main.forms import EditProfileForm, EmptyForm, PostForm, SearchForm
+from app.main.forms import EditProfileForm, EmptyForm, PostForm, SearchForm, MessageForm
 from flask_login import current_user, login_required
 import sqlalchemy as sa
-from app.models import User, Post
+from app.models import User, Post, Message, Notification
 from datetime import datetime, timezone
 from flask_babel import _, get_locale
 from langdetect import detect, LangDetectException
@@ -135,4 +135,63 @@ def search():
     next_url = url_for('main.search', q=g.search_form.q.data, page=page+1) if totals > page * current_app.config['POSTS_PER_PAGE'] else None
     prev_url = url_for('main.explore', q=g.search_form.q.data, page=page-1) if page > 1 else None
     return render_template('search.html', title=_('Search'), posts=posts, next_url=next_url, prev_url=prev_url)
-     
+
+@bp.route('/user/<username>/popup')
+@login_required
+def user_popup(username):
+    user = db.first_or_404(sa.select(User).where(User.username == username))
+    form = EmptyForm()
+    return render_template('user_popup.html', form=form, user=user)
+
+@bp.route('/send_message/<recipient>', methods=['GET', 'POST'])
+@login_required
+def send_message(recipient):
+    user = db.first_or_404(sa.select(User).where(User.username == recipient))
+    form = MessageForm()
+    if form.validate_on_submit():
+        msg = Message(author=current_user, recipient=user, body=form.message.data)
+        db.session.add(msg)
+        user.add_notification('unread_message_count', user.unread_message_count())
+        db.session.commit()
+        flash(_('Your message has been sent.'))
+        return redirect(url_for('main.user', username=recipient))
+    return render_template('send_message.html', form=form)
+
+
+@bp.route('/usersmesage/')
+@login_required
+def usrmsg():
+    query = sa.select(Message).where(sa.or_(Message.author == current_user, Message.recipient == current_user)).group_by(Message.recipient_id, Message.sender_id).order_by(Message.timestamp.desc())
+    users = db.session.scalars(query)
+    return render_template("user_chat.html", users=users)
+@bp.route('/messages')
+@login_required
+def messages():
+    query = current_user.messages_received.select().order_by(Message.timestamp.desc())
+    page = request.args.get('page', 1, int)
+    msgs = db.paginate(query, page=page, per_page=current_app.config['POSTS_PER_PAGE'], error_out=False)
+    for msg in msgs:
+        msg.check_status = True
+        msg.time_seen = datetime.now(timezone.utc)
+    current_user.add_notification('unread_message_count', 0)
+    db.session.commit()
+    next_url = url_for('main.messages', page=msgs.next_num) \
+        if msgs.has_next else None
+    prev_url = url_for('main.messages', page=msgs.prev_num) \
+        if msgs.has_prev else None
+    return render_template('message.html', messages=msgs.items, next_url=next_url, prev_url=prev_url)
+
+@bp.route('/notifications')
+@login_required
+def notifications():
+    since = request.args.get('since', 0.0, float)
+    query = current_user.notifications.select().where(Notification.timestamp > since).order_by(Notification.timestamp.asc())
+    notifications = db.session.scalars(query)
+    return [
+        {
+            'name': n.name,
+            'data': n.get_data(),
+            'timestamp': n.timestamp,
+        } for n in notifications
+    ]
+

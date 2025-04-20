@@ -7,8 +7,6 @@ from app.models import User
 from flask_babel import lazy_gettext as _l
 from flask import request
 
-
-
         
 class EditProfileForm(FlaskForm):
     username = StringField(_l('Username'), validators=[DataRequired()])
@@ -42,3 +40,6 @@ class SearchForm(FlaskForm):
             kwargs['meta'] = {'crsf': False}
         super(SearchForm, self).__init__(*args, **kwargs)
         
+class MessageForm(FlaskForm):
+    message = TextAreaField(_l('Message'), validators=[DataRequired(), Length(min=0, max=140)])
+    submit = SubmitField(_l('send'))
