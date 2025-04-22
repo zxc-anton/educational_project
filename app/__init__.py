@@ -10,6 +10,8 @@ from flask_mail import Mail
 from flask_moment import Moment
 from flask_babel import Babel, lazy_gettext as _l
 from elasticsearch import Elasticsearch
+import rq
+from redis import Redis
 
 def get_locale():
     return request.accept_languages.best_match(current_app.config['LANGUAGES'])
@@ -58,6 +60,8 @@ def create_app(config=Config):
     moment.init_app(app)
     babel.init_app(app, locale_selector=get_locale)
     app.elasticsearch = Elasticsearch(app.config['ELASTICSEARCH_URL']) if app.config['ELASTICSEARCH_URL'] else None
+    app.redis = Redis.from_url(app.config['REDIS_URL'])
+    app.task_queue = rq.Queue('app', connection=app.redis)
         
     from app.errors import bp as errors
     app.register_blueprint(errors)
@@ -67,6 +71,8 @@ def create_app(config=Config):
     app.register_blueprint(auth)
     from app.cli import bp as cli
     app.register_blueprint(cli)
+    from app.api import bp as api
+    app.register_blueprint(api, url_prefix='/api')
 
     
     return app

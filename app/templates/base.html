@@ -29,9 +29,7 @@
             <li class="nav-item">
               <a class="nav-link" aria-current="page" href="{{ url_for('main.explore') }}">{{ _('Explore') }}</a>
             </li>
-            {% if current_user.is_anonymous %}
-            ...
-            {% else %}
+            {% if not current_user.is_anonymous %}
             <li class="nav-item">
               <a class="nav-link" aria-current="page" href="{{ url_for('main.messages') }}">
                   {{ _('Messages') }}
@@ -153,14 +151,31 @@
         const response = await fetch('{{ url_for('main.notifications') }}?since=' + since);
         const notifications = await response.json();
         for (let i = 0; i < notifications.length; i++) {
-          if (notifications[i].name == 'unread_message_count')
-            set_message_count(notifications[i].data);
+          switch (notifications[i].name) {
+            case 'unread_message_count':
+              set_message_count(notifications[i].data);
+              break;
+            case 'task_progress':
+              set_task_progress(notifications[i].data.task_id,
+                  notifications[i].data.progress);
+              break;
+          }
           since = notifications[i].timestamp;
         }
       }, 10000);
     }
     document.addEventListener('DOMContentLoaded', initialize_notifications);
     {% endif %}
+    
   </script>
+  <script>
+    ...
+    function set_task_progress(task_id, progress) {
+        const progressElement = document.getElementById(task_id + '-progress');
+        if (progressElement) {
+            progressElement.innerText = progress;
+        }
+    }
+</script>
   </body>
 </html>
