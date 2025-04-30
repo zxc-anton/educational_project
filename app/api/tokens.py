@@ -10,7 +10,7 @@ def get_token():
     db.session.commit()
     return {'token': token}
 
-@bp.route('', methods='/tokens', methods=['DELETE'])
+@bp.route('/tokens', methods=['DELETE'])
 @basic_auth.login_required
 def revoke_token():
     token_auth.current_user().revoke_token()
